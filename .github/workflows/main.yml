@@ -42,6 +42,11 @@ jobs:
 
       # Optional: Add step to run tests here
 
+      - name: Zip artifact for deployment
+        run: |
+          cd python-functions
+          zip -r ../release.zip .
+
       - name: Login to Azure
         uses: azure/login@v2
         with:
@@ -53,4 +58,4 @@ jobs:
         with:
           app-name: 'az-observability'
           slot-name: 'Production'
-          package: ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}
+          package: release.zip
