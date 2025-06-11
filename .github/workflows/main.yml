@@ -46,6 +46,12 @@ jobs:
         run: |
           cd python-functions
           zip -r ../release.zip .
+      
+      - name: Upload deployment package
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployed-package
+          path: release.zip
 
       - name: Login to Azure
         uses: azure/login@v2
