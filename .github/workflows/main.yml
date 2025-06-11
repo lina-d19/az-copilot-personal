@@ -16,7 +16,7 @@ env:
 
 jobs:
   build_and_deploy:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     permissions:
       contents: read #This is required for actions/checkout
       id-token: write #This is required for requesting the JWT
