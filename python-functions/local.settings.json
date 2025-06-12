@@ -1,7 +1,0 @@
-{
-  "IsEncrypted": false,
-  "Values": {
-    "AzureWebJobsStorage": "DefaultEndpointsProtocol=https;AccountName=copilotblob;AccountKey=Jq3LVhlQxm8LDbVeusbTjCF/G2MDdHNe/pBCmOGptlaPJFo9AhzRticuAmAFLMecgZxyfJdmfeCw+AStY29KiQ==;EndpointSuffix=core.windows.net",
-    "FUNCTIONS_WORKER_RUNTIME": "python"
-  }
-}
