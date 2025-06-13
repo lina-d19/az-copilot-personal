@@ -1,6 +1,7 @@
 import azure.functions as func
 import logging
 import json
+import datetime
 from common import load_json_from_blob, build_params_dict, log_interaction
 
 def main(req: func.HttpRequest) -> func.HttpResponse:
@@ -33,6 +34,6 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
 
     response = {"incidents": filtered}
     params = build_params_dict(region=region, status=status, date=date, start_date=start_date, end_date=end_date)
-    timestamp = func.datetime.datetime.utcnow().isoformat() + "Z"
+    timestamp = datetime.datetime.utcnow().isoformat() + "Z"
     log_interaction("list-incidents", params, response, timestamp)
     return func.HttpResponse(json.dumps(response), mimetype="application/json")
