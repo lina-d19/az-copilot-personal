@@ -9,6 +9,7 @@ import os
 def load_json_from_blob(blob_name):
     credential = DefaultAzureCredential()
     account_url = os.environ.get("BLOB_ACCOUNT_URL")
+    logging.info(f"BLOB_ACCOUNT_URL: {account_url}")
     container_name = "telemetry"
     blob_service_client = BlobServiceClient(account_url=account_url, credential=credential)
     container_client = blob_service_client.get_container_client(container_name)
