@@ -26,10 +26,12 @@ def build_params_dict(**kwargs):
     return {k: v for k, v in kwargs.items() if v is not None and v != ""}
 
 def log_interaction(query, parameters, response, timestamp, log_file="interactions-log.json"):
-    connection_string = os.environ.get("AzureWebJobsStorage")
+    # Use Azure Blob Storage for logging with Azure AD auth
+    account_url = os.environ.get("BLOB_ACCOUNT_URL")  # e.g., https://<storage-account-name>.blob.core.windows.net
+    credential = DefaultAzureCredential()
     container_name = "telemetry"
     blob_name = log_file
-    blob_service_client = BlobServiceClient.from_connection_string(connection_string)
+    blob_service_client = BlobServiceClient(account_url=account_url, credential=credential)
     container_client = blob_service_client.get_container_client(container_name)
     blob_client = container_client.get_blob_client(blob_name)
     try:
