@@ -1,6 +1,7 @@
 import azure.functions as func
 import logging
 import json
+import datetime
 from common import load_json_from_blob, build_params_dict, log_interaction
 
 def main(req: func.HttpRequest) -> func.HttpResponse:
@@ -39,6 +40,6 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         "check-errors",
         params,
         response,
-        func.datetime.datetime.utcnow().isoformat() + "Z"
+        datetime.datetime.utcnow().isoformat() + "Z"
     )
     return func.HttpResponse(json.dumps(response), mimetype="application/json")
