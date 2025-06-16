@@ -1,0 +1,16 @@
+{
+  "skills": [
+    {
+      "skill": "get_latency",
+      "description": "Get average latency, compare regions, or analyze latency trends."
+    },
+    {
+      "skill": "check_errors",
+      "description": "Check error counts by region, code, or date."
+    },
+    {
+      "skill": "list_incidents",
+      "description": "List incidents by region, status, or date."
+    }
+  ]
+}

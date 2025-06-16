@@ -14,7 +14,12 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
     compare = req.params.get("compare")
     update_timestamp = req.params.get("update_timestamp")
 
+    logging.info(f"DEBUG: Received region param: {region}")
+    logging.info(f"DEBUG: Received date param: {date}")
+
     latency_data = load_json_from_blob("latency.json")
+    unique_regions = set(entry.get("region", "") for entry in latency_data)
+    logging.info(f"DEBUG: Regions in data: {unique_regions}")
 
     def format_float(val):
         return int(round(val)) if isinstance(val, float) else val
@@ -109,6 +114,25 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
             )
         }
         params = build_params_dict(update_timestamp=update_timestamp, region=region)
+        timestamp = datetime.datetime.utcnow().isoformat() + "Z"
+        log_interaction("get-latency", params, response, timestamp)
+        return func.HttpResponse(json.dumps(response), mimetype="application/json")
+
+    # Handle 'recent' date: return the most recent entry for the region
+    if date == "recent" and region:
+        region_entries = [entry for entry in latency_data if entry.get("region", "").lower() == region.lower()]
+        if region_entries:
+            # Sort by timestamp descending, get the first
+            region_entries.sort(key=lambda e: e.get("timestamp", ""), reverse=True)
+            most_recent = region_entries[0]
+            response = {
+                "region": region,
+                "timestamp": most_recent.get("timestamp", ""),
+                "latencyMs": format_float(most_recent.get("latencyMs", 0))
+            }
+        else:
+            response = {"region": region, "message": "No data found for region."}
+        params = build_params_dict(region=region, date=date)
         timestamp = datetime.datetime.utcnow().isoformat() + "Z"
         log_interaction("get-latency", params, response, timestamp)
         return func.HttpResponse(json.dumps(response), mimetype="application/json")
