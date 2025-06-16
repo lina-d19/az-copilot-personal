@@ -19,7 +19,7 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
     # Azure Blob Storage setup
     connect_str = os.getenv('AzureWebJobsStorage')
     container_name = 'telemetry'
-    blob_name = 'copilot-logs.jsonl'
+    blob_name = 'copilot-logs.json'  # Changed from .jsonl to .json
     blob_service_client = BlobServiceClient.from_connection_string(connect_str)
     blob_client = blob_service_client.get_blob_client(container=container_name, blob=blob_name)
 
@@ -29,9 +29,13 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
     except Exception:
         existing_data = ''  # File may not exist yet
 
-    # Prepare new log line
-    new_log_line = json.dumps(log_data) + '\n'
-    updated_data = existing_data + new_log_line
+    # Prepare new log entry (as a JSON array)
+    try:
+        logs = json.loads(existing_data) if existing_data else []
+    except Exception:
+        logs = []
+    logs.append(log_data)
+    updated_data = json.dumps(logs, indent=2)
 
     # Upload the updated log file (overwrite)
     try:
@@ -43,4 +47,4 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
             status_code=500
         )
 
-    return func.HttpResponse('Log appended to copilot-logs.jsonl.', status_code=200)
+    return func.HttpResponse('Log appended to copilot-logs.json.', status_code=200)

@@ -79,57 +79,31 @@ export function activate(context: vscode.ExtensionContext) {
 
 			// Extract parameters from "key: value" pairs
 			const params: Record<string, string> = {};
-			const paramRegex = /(\w+):\s*([\w-]+)/g;
+			const paramRegex = /([a-zA-Z_]+):\s*([\w-]+)/g;
 			let match;
 			while ((match = paramRegex.exec(userMessage)) !== null) {
 				params[match[1]] = match[2];
 			}
-			await sendLogToBackend({
-				timestamp: new Date().toISOString(),
-				event: 'params_extracted',
-				message: 'Params extracted',
-				params
-			});
 
-			const normalizedUserMsg = userMessage.replace(/\s+/g, "");
-			await sendLogToBackend({
-				timestamp: new Date().toISOString(),
-				event: 'normalized_user_message',
-				message: 'Normalized user message',
-				normalizedUserMsg
-			});
-
-			// --- New: Extract region and date from natural language ---
-			// Region extraction (add more as needed)
-			// --- Improved: Region extraction ignores spaces ---
+			// --- Robust region and date extraction from natural language ---
 			const regionList = [
 				"eastus", "westus", "northeurope", "westeurope", "centralus", "southcentralus"
 			];
-			let regionFound = false;
+			const normalizedUserMsg = userMessage.replace(/\s+/g, "");
 			for (const region of regionList) {
-				if (normalizedUserMsg.includes(region)) {
+				// Match both with and without spaces (e.g., "east us" or "eastus")
+				if (
+					userMessage.includes(region) ||
+					userMessage.replace(/\s+/g, "").includes(region) ||
+					userMessage.replace(/\s+/g, "").includes(region.replace("us", " us"))
+				) {
 					params["region"] = region;
-					await sendLogToBackend({
-						timestamp: new Date().toISOString(),
-						event: 'region_detected',
-						message: 'Region detected and set',
-						region: params["region"]
-					});
-					regionFound = true;
 					break;
 				}
 			}
-			if (!regionFound) {
-				await sendLogToBackend({
-					timestamp: new Date().toISOString(),
-					event: 'no_region_detected',
-					message: 'No region detected in user message.'
-				});
-			}
-			// Date extraction and conversion to ISO format
+			// Date extraction
 			const now = new Date();
 			if (userMessage.includes("today")) {
-				// Format: YYYY-MM-DD
 				const yyyy = now.getFullYear();
 				const mm = String(now.getMonth() + 1).padStart(2, '0');
 				const dd = String(now.getDate()).padStart(2, '0');
@@ -144,9 +118,6 @@ export function activate(context: vscode.ExtensionContext) {
 			} else if (userMessage.includes("recent")) {
 				params["date"] = "recent";
 			}
-			// --- End new ---
-
-			// If region is present and no date is specified, default to date=recent
 			if (params["region"] && !params["date"]) {
 				params["date"] = "recent";
 			}
@@ -157,6 +128,9 @@ export function activate(context: vscode.ExtensionContext) {
 				message: 'Final params before URL construction',
 				params
 			});
+
+			// Show params in a popup for debugging before URL construction
+			await vscode.window.showInformationMessage('Params before URL: ' + JSON.stringify(params));
 
 			// Use your deployed API URL here!
 			const apiUrl = `https://az-observability.azurewebsites.net/api/${matchedSkill.skill}`;
@@ -171,11 +145,6 @@ export function activate(context: vscode.ExtensionContext) {
 				url: url.toString(),
 				params
 			});
-			outputChannel.appendLine('Calling backend URL: ' + url.toString());
-			outputChannel.show(true);
-
-			outputChannel.appendLine('About to call backend: ' + matchedSkill.skill);
-			outputChannel.show(true);
 			try {
 				const response = await new Promise<string>((resolve, reject) => {
 					https.get(url.toString(), (res) => {
@@ -184,8 +153,6 @@ export function activate(context: vscode.ExtensionContext) {
 						res.on('end', () => resolve(data));
 					}).on('error', reject);
 				});
-				outputChannel.appendLine(`Backend response for ${matchedSkill.skill}: ${response}`);
-				outputChannel.show(true);
 				// Log backend response
 				await sendLogToBackend({
 					timestamp: new Date().toISOString(),
@@ -197,8 +164,6 @@ export function activate(context: vscode.ExtensionContext) {
 				});
 				stream.markdown(`**${matchedSkill.skill} result:**\n\n${response}`);
 			} catch (err) {
-				outputChannel.appendLine(`Failed to call backend: ${err}`);
-				outputChannel.show(true);
 				// Log backend error
 				await sendLogToBackend({
 					timestamp: new Date().toISOString(),
@@ -256,12 +221,18 @@ export function activate(context: vscode.ExtensionContext) {
 			vscode.window.showErrorMessage('Unknown skill: ' + skillName);
 			return;
 		}
-		const apiUrl = `http://localhost:7071/api/${skillName}`;
+		const apiUrl = `http://az-observability.azurewebsites.net/api/${skillName}`;
 		const url = new URL(apiUrl);
 		Object.entries(params).forEach(([key, value]) => {
 			if (key !== 'skill') {
 				url.searchParams.append(key, value as string);
 			}
+		});
+		await sendLogToBackend({
+			timestamp: new Date().toISOString(),
+			event: 'testSkill_invoked',
+			skill: skillName,
+			params
 		});
 		try {
 			const response = await new Promise<string>((resolve, reject) => {
@@ -280,12 +251,26 @@ export function activate(context: vscode.ExtensionContext) {
 					reject(err);
 				});
 			});
+			await sendLogToBackend({
+				timestamp: new Date().toISOString(),
+				event: 'testSkill_backend_response',
+				skill: skillName,
+				params,
+				response
+			});
 			if (!response) {
 				vscode.window.showWarningMessage(`No response received from backend for ${skillName}.`);
 			} else {
 				vscode.window.showInformationMessage(`Result for ${skillName}: ${response}`);
 			}
 		} catch (err) {
+			await sendLogToBackend({
+				timestamp: new Date().toISOString(),
+				event: 'testSkill_backend_error',
+				skill: skillName,
+				params,
+				error: String(err)
+			});
 			console.error('Failed to call backend:', err);
 			vscode.window.showErrorMessage(`Failed to call backend: ${err}`);
 		}
@@ -328,14 +313,4 @@ async function sendLogToBackend(log: Record<string, any>) {
 	} catch (e) {
 		outputChannel.appendLine('Failed to send log to backend: ' + e);
 	}
-}
-
-// Utility function to append logs to a file in the user's home directory
-function appendLogToFile(log: Record<string, any>) {
-    try {
-        const logFilePath = path.join(os.homedir(), 'az-copilot-log.txt');
-        fs.appendFileSync(logFilePath, JSON.stringify(log) + '\n');
-    } catch (e) {
-        // Fallback: ignore file write errors
-    }
 }
