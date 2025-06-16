@@ -40,10 +40,11 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
     # Upload the updated log file (overwrite)
     try:
         blob_client.upload_blob(updated_data, overwrite=True)
+        logging.info('Successfully wrote log to blob.')
     except Exception as e:
         logging.error(f'Failed to write log to blob: {e}')
         return func.HttpResponse(
-            f'Failed to write log to blob: {e}',
+            f'Failed to write log to blob: {e}\nLogs attempted: {updated_data[:500]}',
             status_code=500
         )
 
