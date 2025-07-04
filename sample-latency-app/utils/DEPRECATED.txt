@@ -1,0 +1,5 @@
+The following files are deprecated and replaced by more professional names:
+- slowMath.js → dataProcessor.js
+- blockingIO.js → configManager.js
+
+Please update all imports and remove these files if not needed.

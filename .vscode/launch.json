@@ -1,0 +1,21 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run Extension",
+      "type": "extensionHost",
+      "request": "launch",
+      "runtimeExecutable": "${execPath}",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}/azure-observability-copilot"
+      ],
+      "outFiles": [
+        "${workspaceFolder}/azure-observability-copilot/dist/**/*.js"
+      ],
+      "preLaunchTask": "npm: compile (copilot)",
+      "windows": {
+        "runtimeExecutable": "${execPath}"
+      }
+    }
+  ]
+}

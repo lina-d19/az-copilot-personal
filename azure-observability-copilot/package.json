@@ -1,28 +1,50 @@
 {
   "name": "azure-observability-copilot",
+  "publisher": "t-dbaghlina",
   "displayName": "Azure Observability Copilot",
-  "description": "",
+  "description": "Azure Observability Copilot helps you monitor, analyze, and troubleshoot your Azure applications directly from VS Code. Query latency, errors, incidents, and more using natural language, and get actionable insights powered by your own backend or AI.",
   "version": "0.0.1",
   "engines": {
-    "vscode": "^1.100.0"
+    "vscode": "^1.101.0"
   },
   "categories": [
-    "Other"
+    "AI",
+    "Azure",
+    "Chat"
   ],
   "activationEvents": [
-    "*",
-    "onChat:azure-observability-copilot"
+    "onChatParticipant:azure-observability-copilot",
+    "onCommand:azure-observability-copilot.helloWorld"
   ],
   "main": "./dist/extension.js",
   "contributes": {
+    "chatParticipants": [
+      {
+        "id": "azure-observability-copilot",
+        "fullName": "Azure Observability Copilot",
+        "name": "azureObservabilityCopilot",
+        "isSticky": true,
+        "description": "Monitor your Azure applications directly from VS Code! The assistant responds to queries such as: 'Is our Function App returning errors today?', 'Any active service health incidents in East US?', 'What’s the average latency for our main API?', etc.",
+        "disambiguation": [
+          {
+            "category": "Azure Observability",
+            "description": "The user wants to know the latency, errors, or incidents related to their Azure applications.",
+            "examples": [
+              "What is the average latency in North Europe?",
+              "Are there any active service health incidents in East US?",
+              "Is our Function App returning errors today?",
+              "How many errors were there in the last 24 hours?",
+              "What's the average latency for our main API?",
+              "Were there any service incidents in the last week?"
+            ]
+          }
+        ]
+      }
+    ],
     "commands": [
       {
         "command": "azure-observability-copilot.helloWorld",
         "title": "Hello World"
-      },
-      {
-        "command": "azure-observability-copilot.testSkill",
-        "title": "Azure Observability Copilot: Test Skill"
       }
     ]
   },
@@ -41,16 +63,19 @@
     "test": "vscode-test"
   },
   "devDependencies": {
-    "@types/vscode": "^1.100.0",
     "@types/mocha": "^10.0.10",
     "@types/node": "20.x",
+    "@types/vscode": "^1.101.0",
     "@typescript-eslint/eslint-plugin": "^8.31.1",
     "@typescript-eslint/parser": "^8.31.1",
-    "eslint": "^9.25.1",
-    "esbuild": "^0.25.3",
-    "npm-run-all": "^4.1.5",
-    "typescript": "^5.8.3",
     "@vscode/test-cli": "^0.0.10",
-    "@vscode/test-electron": "^2.5.2"
+    "@vscode/test-electron": "^2.5.2",
+    "esbuild": "^0.25.3",
+    "eslint": "^9.25.1",
+    "npm-run-all": "^4.1.5",
+    "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "node-fetch": "^3.3.2"
   }
 }
