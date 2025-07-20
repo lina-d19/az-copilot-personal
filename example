@@ -1,0 +1,9 @@
+# Start with Yeoman generator
+npm install -g yo generator-code
+yo code
+
+# Example choices I made:
+# ✓ New Extension (TypeScript)
+# ✓ Name: azure-observability-copilot
+# ✓ Identifier: azure-observability-copilot
+# ✓ Description: Azure Observability Copilot

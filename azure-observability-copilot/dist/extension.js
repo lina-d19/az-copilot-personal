@@ -6547,6 +6547,45 @@ function normalizeRegion(region) {
   const normalized = region.trim().toLowerCase();
   return regionMap[normalized] || normalized.replace(/\s+/g, "");
 }
+async function generateKQLQuery(userQuery, azureApiKey, endpoint, deployment, apiVersion = "2025-01-01-preview") {
+  const prompt = `Convert this user query into a valid KQL query for Azure Log Analytics.
+
+Available tables and common fields:
+- AppRequests: timestamp, cloud_RoleName, operation_Name, duration, resultCode, client_CountryOrRegion
+- AppTraces: timestamp, message, severityLevel, cloud_RoleName
+- AppExceptions: timestamp, type, outerMessage, cloud_RoleName
+- AppPerformanceCounters: timestamp, category, counter, value, cloud_RoleName
+
+Common operators: where, summarize, avg(), max(), min(), count(), ago(), bin()
+Time functions: ago(5h), ago(1d), startofday(now())
+
+User query: "${userQuery}"
+
+Generate only the KQL query without explanation:`;
+  const apiUrl = `${endpoint}/openai/deployments/${deployment}/chat/completions?api-version=${apiVersion}`;
+  const fetch2 = (await Promise.resolve().then(() => (init_src(), src_exports))).default;
+  const response = await fetch2(apiUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "api-key": azureApiKey
+    },
+    body: JSON.stringify({
+      messages: [
+        { role: "system", content: "You are an expert in KQL (Kusto Query Language) for Azure Log Analytics. Generate clean, executable KQL queries." },
+        { role: "user", content: prompt }
+      ]
+    })
+  });
+  const data = await response.json();
+  if (data.error) {
+    throw new Error(`Azure OpenAI API error: ${data.error.message || JSON.stringify(data.error)}`);
+  }
+  if (!data.choices || !data.choices[0]) {
+    throw new Error(`Invalid Azure OpenAI response: ${JSON.stringify(data)}`);
+  }
+  return data.choices[0].message.content.trim();
+}
 async function extractParametersWithAzureOpenAI(userQuery, azureApiKey, endpoint, deployment, apiVersion = "2025-01-01-preview") {
   const prompt = `Extract the following parameters from the user's query. If a parameter is not present, return null.
 
@@ -6601,6 +6640,86 @@ User query: "${userQuery}"`;
   }
   return params;
 }
+function simulateKQLExecution(kqlQuery, mockData) {
+  console.log(`Executing KQL: ${kqlQuery}`);
+  let result = mockData;
+  const tableMatch = kqlQuery.match(/^(AppRequests|AppTraces|AppExceptions|AppPerformanceCounters)/);
+  if (tableMatch) {
+    const table = tableMatch[1];
+    result = result.filter((item) => item.table === table);
+  }
+  const agoMatch = kqlQuery.match(/ago\((\d+)([hd])\)/);
+  if (agoMatch) {
+    const value = parseInt(agoMatch[1]);
+    const unit = agoMatch[2];
+    const multiplier = unit === "h" ? 60 * 60 * 1e3 : 24 * 60 * 60 * 1e3;
+    const cutoffTime = new Date(Date.now() - value * multiplier);
+    result = result.filter((item) => new Date(item.timestamp) > cutoffTime);
+  }
+  const regionMatch = kqlQuery.match(/cloud_RoleName\s*==\s*["']([^"']+)["']/);
+  if (regionMatch) {
+    const region = regionMatch[1];
+    result = result.filter((item) => item.cloud_RoleName === region || item.region === region);
+  }
+  if (kqlQuery.includes("summarize") && kqlQuery.includes("avg(duration)")) {
+    if (result.length === 0) {
+      return { average_duration: 0, count: 0 };
+    }
+    const sum = result.reduce((acc, item) => acc + (item.duration || item.latency || 0), 0);
+    return {
+      average_duration: Math.round(sum / result.length),
+      count: result.length,
+      table: result[0]?.table || "AppRequests"
+    };
+  }
+  if (kqlQuery.includes("summarize") && kqlQuery.includes("count()")) {
+    return {
+      count: result.length,
+      table: result[0]?.table || "AppRequests"
+    };
+  }
+  if (kqlQuery.includes("summarize") && kqlQuery.includes("max(duration)")) {
+    if (result.length === 0) {
+      return { max_duration: 0, count: 0 };
+    }
+    const max = Math.max(...result.map((item) => item.duration || item.latency || 0));
+    return {
+      max_duration: max,
+      count: result.length,
+      table: result[0]?.table || "AppRequests"
+    };
+  }
+  if (kqlQuery.includes("by cloud_RoleName")) {
+    const grouped = result.reduce((acc, item) => {
+      const key = item.cloud_RoleName || item.region || "unknown";
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(item);
+      return acc;
+    }, {});
+    if (kqlQuery.includes("avg(duration)")) {
+      return Object.entries(grouped).map(([region, items]) => ({
+        cloud_RoleName: region,
+        average_duration: Math.round(items.reduce((sum, item) => sum + (item.duration || item.latency || 0), 0) / items.length),
+        count: items.length
+      }));
+    }
+    return Object.entries(grouped).map(([region, items]) => ({
+      cloud_RoleName: region,
+      count: items.length
+    }));
+  }
+  return result;
+}
+var mockLogAnalyticsData = [
+  { timestamp: "2025-01-20T10:00:00Z", cloud_RoleName: "eastus", duration: 45, table: "AppRequests", operation_Name: "GET /api/data" },
+  { timestamp: "2025-01-20T11:00:00Z", cloud_RoleName: "eastus", duration: 52, table: "AppRequests", operation_Name: "POST /api/update" },
+  { timestamp: "2025-01-20T12:00:00Z", cloud_RoleName: "westus", duration: 38, table: "AppRequests", operation_Name: "GET /api/data" },
+  { timestamp: "2025-01-20T13:00:00Z", cloud_RoleName: "westus", duration: 41, table: "AppRequests", operation_Name: "GET /api/status" },
+  { timestamp: "2025-01-20T09:00:00Z", cloud_RoleName: "eastus", duration: 159, table: "AppRequests", operation_Name: "GET /api/heavy" },
+  { timestamp: "2025-01-20T14:00:00Z", cloud_RoleName: "northeurope", duration: 33, table: "AppRequests", operation_Name: "GET /api/data" },
+  { timestamp: "2025-01-20T10:30:00Z", cloud_RoleName: "eastus", severityLevel: 3, message: "Error processing request", table: "AppTraces" },
+  { timestamp: "2025-01-20T11:30:00Z", cloud_RoleName: "westus", severityLevel: 2, message: "Warning: slow response", table: "AppTraces" }
+];
 function buildFunctionUrl(baseUrl, params) {
   const query = Object.entries(params).filter(([_, value]) => value !== null && value !== void 0 && value !== "").map(
     ([key, value]) => Array.isArray(value) ? value.map((v) => `${encodeURIComponent(key)}=${encodeURIComponent(v)}`).join("&") : `${encodeURIComponent(key)}=${encodeURIComponent(value)}`
@@ -6641,6 +6760,25 @@ Respond in natural language:`;
     throw new Error(`Invalid Azure OpenAI response: ${JSON.stringify(data)}`);
   }
   return data.choices[0].message.content.trim();
+}
+async function handleUserQueryWithKQL(userQuery, azureApiKey, endpoint, deployment) {
+  try {
+    const kqlQuery = await generateKQLQuery(userQuery, azureApiKey, endpoint, deployment);
+    console.log(`Generated KQL: ${kqlQuery}`);
+    const queryResult = simulateKQLExecution(kqlQuery, mockLogAnalyticsData);
+    console.log(`Query Result:`, queryResult);
+    const nlResponse = await generateNaturalLanguageResponse(
+      userQuery,
+      { kql_query: kqlQuery, results: queryResult },
+      azureApiKey,
+      endpoint,
+      deployment
+    );
+    return nlResponse;
+  } catch (error) {
+    console.error("Error in KQL handler:", error);
+    return await handleUserQuery(userQuery, azureApiKey, endpoint, deployment);
+  }
 }
 async function handleUserQuery(userQuery, azureApiKey, endpoint, deployment) {
   const params = await extractParametersWithAzureOpenAI(userQuery, azureApiKey, endpoint, deployment);
@@ -6699,7 +6837,7 @@ function activate(context) {
     }
     let responseMessage = "";
     try {
-      const result = await handleUserQuery(userQuery, azureApiKey, endpoint, deployment);
+      const result = await handleUserQueryWithKQL(userQuery, azureApiKey, endpoint, deployment);
       responseMessage = typeof result === "string" ? result : JSON.stringify(result, null, 2);
     } catch (err) {
       responseMessage = `Error: ${err.message}`;
